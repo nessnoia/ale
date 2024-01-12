@@ -163,7 +163,6 @@ function! ale#signature#HandleLSPResponse(conn_id, response) abort
 								let l:pair_bracket_pos = searchpairpos('(', '', ')', 'nbW')[1]
 								echom l:pair_bracket_pos
     						call ale#floating_preview#Show(l:function, {
-								\		'col': l:pair_bracket_pos,
 								\   'moved': [0, 0, 0],
 								\   'commands': l:commands,
 								\})
