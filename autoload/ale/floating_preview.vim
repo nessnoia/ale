@@ -94,7 +94,7 @@ function! s:VimShow(lines, options) abort
     if g:ale_close_preview_on_insert
         augroup ale_floating_preview_window
             autocmd!
-            autocmd InsertEnter * ++once call s:VimClose()
+            autocmd InsertEnter * ++once call ale#floating_preview#VimClose()
         augroup END
     endif
 endfunction
@@ -146,25 +146,17 @@ function! s:VimCreate(options) abort
     " default options
     let l:popup_opts = extend({
     \    'line': 'cursor+1',
-    \    'col': 'cursor',
+    \    'col': get(a:options, 'col', 'cursor'),
     \    'drag': v:true,
     \    'resize': v:true,
     \    'close': 'button',
     \    'padding': [0, 1, 0, 1],
-    \    'border': [],
-    \    'borderchars': empty(g:ale_floating_window_border) ? [' '] : [
-    \        get(g:ale_floating_window_border, 1, '-'),
-    \        get(g:ale_floating_window_border, 6, '|'),
-    \        get(g:ale_floating_window_border, 7, '-'),
-    \        get(g:ale_floating_window_border, 0, '|'),
-    \        get(g:ale_floating_window_border, 2, '+'),
-    \        get(g:ale_floating_window_border, 3, '+'),
-    \        get(g:ale_floating_window_border, 4, '+'),
-    \        get(g:ale_floating_window_border, 5, '+'),
-    \    ],
-    \    'moved': 'any',
+    \    'moved': get(a:options, 'moved', 'any'),
     \ }, s:GetPopupOpts())
 
+		if get(g:, 'ale_syntax_highlight_floating_preview', 0)
+        call extend(a:options, {'filetype': &filetype})
+    endif
     let l:popup_id = popup_create([], l:popup_opts)
     call setbufvar(winbufnr(l:popup_id), '&filetype', get(a:options, 'filetype', 'ale-preview'))
     let w:preview = {'id': l:popup_id}
@@ -191,7 +183,7 @@ function! s:NvimClose() abort
     endif
 endfunction
 
-function! s:VimClose() abort
+function! ale#floating_preview#VimClose() abort
     if !exists('w:preview')
         return
     endif

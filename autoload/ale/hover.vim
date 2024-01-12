@@ -378,3 +378,12 @@ function! ale#hover#ShowDocumentationAtCursor() abort
 
     call ale#hover#Show(l:buffer, l:pos[1], l:pos[2], l:options)
 endfunction
+
+" This function implements the :ALESignatureHelp command.
+function! ale#hover#ShowSignatureHelpAtCursor() abort
+    let l:buffer = bufnr('')
+    let l:pos = getpos('.')
+    let l:options = {'show_documentation': 1}
+
+    call ale#hover#Show(l:buffer, l:pos[1], l:pos[2], l:options)
+endfunction

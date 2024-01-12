@@ -288,6 +288,9 @@ command! -bar -nargs=* ALEFindReferences :call ale#references#Find(<f-args>)
 " Show summary information for the cursor.
 command! -bar ALEHover :call ale#hover#ShowAtCursor()
 
+" Show signature help for the function.
+command! -bar ALESignatureHelp :call ale#signature#ShowAtCursor()
+
 " Show documentation for the cursor.
 command! -bar ALEDocumentation :call ale#hover#ShowDocumentationAtCursor()
 

@@ -37,6 +37,7 @@ function! ale#lsp#Register(executable_or_address, project, init_options) abort
         \   'init_queue': [],
         \   'capabilities': {
         \       'hover': 0,
+        \       'signatureHelp': 0,
         \       'rename': 0,
         \       'filerename': 0,
         \       'references': 0,
@@ -206,6 +207,14 @@ function! s:UpdateCapabilities(conn, capabilities) abort
 
     if type(get(a:capabilities, 'hoverProvider')) is v:t_dict
         let a:conn.capabilities.hover = 1
+    endif
+
+    if get(a:capabilities, 'signatureHelpProvider') is v:true
+        let a:conn.capabilities.signatureHelp = 1
+    endif
+
+    if type(get(a:capabilities, 'signatureHelpProvider')) is v:t_dict
+        let a:conn.capabilities.signatureHelp = 1
     endif
 
     if get(a:capabilities, 'referencesProvider') is v:true
@@ -383,6 +392,7 @@ function! ale#lsp#MarkConnectionAsTsserver(conn_id) abort
     let l:conn.initialized = 1
     " Set capabilities which are supported by tsserver.
     let l:conn.capabilities.hover = 1
+    let l:conn.capabilities.signatureHelp = 1
     let l:conn.capabilities.references = 1
     let l:conn.capabilities.completion = 1
     let l:conn.capabilities.completion_trigger_characters = ['.']
@@ -433,6 +443,17 @@ function! s:SendInitMessage(conn) abort
     \               'hover': {
     \                   'dynamicRegistration': v:false,
     \                   'contentFormat': ['plaintext', 'markdown'],
+    \               },
+    \               'signatureHelp': {
+    \                   'dynamicRegistration': v:false,
+		\										'signatureInformation': {
+		\												'documentationFormat': ['plaintext', 'markdown'],
+		\												'parameterInformation': {
+		\														'labelOffsetSupport': v:false,
+		\												},
+		\												'activeParameterSupport': v:true,
+		\										},
+		\										'contextSupport': v:false,
     \               },
     \               'references': {
     \                   'dynamicRegistration': v:false,

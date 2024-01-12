@@ -206,3 +206,12 @@ function! ale#lsp#message#ExecuteCommand(command, arguments) abort
     \   'arguments': a:arguments,
     \}]
 endfunction
+
+function! ale#lsp#message#SignatureHelp(buffer, line, column) abort
+    return [0, 'textDocument/signatureHelp', {
+    \   'textDocument': {
+    \       'uri': ale#util#ToURI(expand('#' . a:buffer . ':p')),
+    \   },
+    \   'position': {'line': a:line - 1, 'character': a:column - 1},
+    \}]
+endfunction
