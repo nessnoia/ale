@@ -45,70 +45,21 @@ function! ale#signature#HandleTSServerResponse(conn_id, response) abort
         endif
 endfunction
 
-" Convert a language name to another one.
-" The language name could be an empty string or v:null
-function! s:ConvertLanguageName(language) abort
-    return a:language
-endfunction
-
-" Cache syntax file (non-)existence to avoid calling globpath repeatedly.
-let s:syntax_file_exists_cache = {}
-
-function! s:SyntaxFileExists(syntax_file) abort
-    if !has_key(s:syntax_file_exists_cache, a:syntax_file)
-        let s:syntax_file_exists_cache[a:syntax_file] =
-        \   !empty(globpath(&runtimepath, a:syntax_file))
-    endif
-
-    return s:syntax_file_exists_cache[a:syntax_file]
-endfunction
-
 function! ale#signature#ParseLSPResult(result) abort
-    let l:includes = {}
     let l:lines = []
-    let l:region_index = 0
     if has_key(a:result, 'signatures')
         let l:signatures = a:result.signatures
     else
-        return
+        return []
     endif
-    let l:list = type(a:result) is v:t_list ? a:result : [a:result]
-		let l:highlights = []
 
-		
-		" call add(l:highlights, 
-			" :highlight MyGroup ctermbg=green guibg=green
-			" :let m = matchaddpos("MyGroup", [[23, 24], 34])
+    for l:signature in l:signatures
+        if type(l:signature) is v:t_dict && has_key(l:signature, 'label')
+            call add(l:lines, l:signature.label)
+        endif
+    endfor
 
-
-		if has_key(a:result, 'activeSignature')
-			return []
-			" let l:signature = l:signatures[a:active_signature]
-		elseif len(l:signatures) == 1
-			let l:signature = l:signatures[0]
-		else
-			" TODO: Loop over signatures and display all that apply. Think in like java or c++. Once I do that I can probably
-			" get rid of the above elseif case
-			return []
-		endif
-
-	" matchstr(getline(a:line)[: a:column - 2], l:regex)
-
-		" if has_key(a:result, 'activeParameter') || has_key(l:signature, 'activeParameter')
-		" else
-		" endif
-
-		if !empty(l:lines)
-			call add(l:lines, '')
-		endif
-
-		if type(l:signature) is v:t_dict
-			call add(l:lines, l:signature.label)
-		endif
-
-
-
-    return [l:highlights, l:lines]
+    return l:lines
 endfunction
 
 function! ale#signature#HandleLSPResponse(conn_id, response) abort
@@ -123,58 +74,35 @@ function! ale#signature#HandleLSPResponse(conn_id, response) abort
             return
         endif
 
-        let [l:commands, l:function] = ale#signature#ParseLSPResult(l:result)
+        let l:functions = ale#signature#ParseLSPResult(l:result)
 
-				" So my thought process here, is count the number of commas before the cursor. And then use that number to know
-				" how many things in (what parameter number) to highlight.
+        if !empty(l:functions)
+            let l:active_param_index = s:GetActiveParameterIndex()
 
-				" we want to look at the commas that are since the last unmatched (
-				" Get the string on the line before the cursor.
-				"
-				" Remove nested inner functions
-				" Count the number of commas before the cursor
-				" If zero: use first param regex
-				" If 1+: we need to write regex that takes in a number I think
-				" let l:line = getline('.')[:col('.')-2]
-				" let l:function_started_col = searchpos('(', 'nb')[1]
-				" let l:function_ended_col = searchpos(')', 'nb')[1]
-				" let l:function_started_col = searchpairpos('(', '', ')', 'nbW')[1]
+            let l:commands = ['call clearmatches()']
+            let [l:add_highlight_commands, l:functions] = s:GetCommandsAndApplicableFunctionsFromActiveIndex(l:functions, l:active_param_index)
+            call extend(l:commands, l:add_highlight_commands)
 
-				" let l:params_no_nested = l:line[l:function_started_col:]
-				" let l:params = l:line[l:function_started_col:]
-
-
-				" let l:test = searchpairpos('(', '', ')', 'nW')
-				" echom l:test
-
-				" let l:param_index = len(split(getline(a:lnum), ',', 1)) - 1
-				" let l:regex = '"\\v((\\(|,){1})\\zs((\\(|\\)|,)@!)\\ze(,.*|\\))"'
-				" let l:regex_test = '\v(\(|,)\zs[^\(\),]*'
-				" let l:matchlist = matchlist(getline('.'), l:regex_test)
-				" echom l:matchlist
-				" call add(l:commands, 'let m = matchadd("ALESignatureHelp", ' . l:regex . ')')
-
-        if !empty(l:function)
             if g:ale_hover_to_floating_preview || g:ale_floating_preview
-								if !s:IsPopupOpen()
-										let s:open_lnum = line('.')
-								endif
+                if !s:IsPopupOpen()
+                    let s:open_lnum = line('.')
+                endif
 
-								let l:pair_bracket_pos = searchpairpos('(', '', ')', 'nbW')[1]
-								echom l:pair_bracket_pos
-    						call ale#floating_preview#Show(l:function, {
-								\   'moved': [0, 0, 0],
-								\   'commands': l:commands,
-								\})
+                call ale#floating_preview#Show(l:functions, {
+                \   'moved': [0, 0, 0],
+                \   'commands': l:commands,
+                \})
 
-								let l:starting_bracket_pos = searchpos('(', 'cnW', line('.'))[1]
-								let l:closing_bracket_pos = searchpos(')','nbW', line('.'))[1]
-								let l:curr_lnum = line('.')
-								
-								if l:starting_bracket_pos != 0 || l:closing_bracket_pos != 0 ||
-											\ l:curr_lnum != s:open_lnum
-										call ale#floating_preview#VimClose()
-								endif
+                let l:starting_bracket_col = searchpos('(', 'nbW', line('.'))[1]
+                let l:closing_bracket_col = searchpos(')', 'cnW', line('.'))[1]+1
+
+                let l:curr_lnum = line('.')
+                let l:cursor_col = getpos('.')[2]
+
+                if l:starting_bracket_col == 0 || l:cursor_col > l:closing_bracket_col
+                            \ || l:curr_lnum != s:open_lnum
+                    call ale#floating_preview#VimClose()
+                endif
 
             elseif g:ale_hover_to_preview
                 call ale#preview#Show(l:function)
@@ -189,7 +117,41 @@ function! s:IsPopupOpen() abort
     if !exists('w:preview')
         return 0
     endif
-		return 1
+    return 1
+endfunction
+
+function! s:GetActiveParameterIndex() abort
+    let l:pair_bracket_pos = searchpairpos('(', '', ')', 'nbW')[1]
+
+    let l:line = getline('.')
+    let l:inner_end_bracket = searchpos(')', 'nbW', line('.'))[1]
+
+    if l:inner_end_bracket != 0
+        let l:inner_start_bracket = searchpos('(', 'nbW', line('.'))[1]
+        let l:line = l:line[l:pair_bracket_pos:l:inner_start_bracket] . l:line[l:inner_end_bracket:getpos('.')[2]-1]
+    else
+        let l:line = l:line[l:pair_bracket_pos:getpos('.')[2]-1]
+    endif
+
+    let l:param_index = count(l:line, ',')
+    return l:param_index
+endfunction
+
+function! s:GetCommandsAndApplicableFunctionsFromActiveIndex(functions, active_param_index) abort
+    let l:commands = []
+    let l:applicable_functions = []
+
+    for l:function in a:functions
+        let l:parameters = split(l:function, '(\|)\|,')
+        if len(l:parameters) - 1 > a:active_param_index
+            let l:active_param = l:parameters[a:active_param_index + 1]
+
+            call add(l:applicable_functions, l:function)
+            call add(l:commands, 'let m = matchadd("ALESignatureHelp", "' . l:active_param . '")')
+        endif
+    endfor
+
+    return [l:commands, l:applicable_functions]
 endfunction
 
 function! s:OnReady(line, column, opt, linter, lsp_details) abort

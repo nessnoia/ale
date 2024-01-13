@@ -154,7 +154,7 @@ function! s:VimCreate(options) abort
     \    'moved': get(a:options, 'moved', 'any'),
     \ }, s:GetPopupOpts())
 
-		if get(g:, 'ale_syntax_highlight_floating_preview', 0)
+    if get(g:, 'ale_syntax_highlight_floating_preview', 0)
         call extend(a:options, {'filetype': &filetype})
     endif
     let l:popup_id = popup_create([], l:popup_opts)
