@@ -146,7 +146,7 @@ function! s:GetCommandsAndApplicableFunctionsFromActiveIndex(functions, active_p
             let l:active_param = l:parameters[a:active_param_index + 1]
 
             call add(l:applicable_functions, l:function)
-            call add(l:commands, 'let m = matchadd("ALESignatureHelp", "' . l:active_param . '")')
+            call add(l:commands, "let m = matchadd('ALESignatureHelp', '" . l:active_param . "')")
         endif
     endfor
 
