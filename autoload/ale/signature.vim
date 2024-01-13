@@ -3,7 +3,6 @@
 
 let s:signature_map = {}
 let s:open_lnum = 0
-let w:active_parameter = 0
 
 if !hlexists('ALESigntureHelp')
     highlight ALESignatureHelp cterm=reverse gui=reverse
