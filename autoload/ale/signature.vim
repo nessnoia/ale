@@ -14,36 +14,6 @@ function! ale#signature#ClearLSPData() abort
     let s:signature_map = {}
 endfunction
 
-function! ale#signature#HandleTSServerResponse(conn_id, response) abort
-    if get(a:response, 'command', '') is# 'quickinfo'
-    \&& has_key(s:signature_map, a:response.request_seq)
-        let l:options = remove(s:signature_map, a:response.request_seq)
-
-        if get(a:response, 'success', v:false) is v:true
-        \&& get(a:response, 'body', v:null) isnot v:null
-            elseif get(l:options, 'hover_from_balloonexpr', 0)
-            \&& exists('*balloon_show')
-            \&& (l:set_balloons is 1 || l:set_balloons is# 'hover')
-                call balloon_show(a:response.body.displayString)
-            elseif get(l:options, 'truncated_echo', 0)
-                if !empty(a:response.body.displayString)
-                    call ale#cursor#TruncatedEcho(a:response.body.displayString)
-                endif
-            elseif g:ale_hover_to_floating_preview || g:ale_floating_preview
-                call ale#floating_preview#Show(split(a:response.body.displayString, "\n"), {
-                \   'filetype': 'ale-preview.message',
-                \})
-            elseif g:ale_hover_to_preview
-                call ale#preview#Show(split(a:response.body.displayString, "\n"), {
-                \   'filetype': 'ale-preview.message',
-                \   'stay_here': 1,
-                \})
-            else
-                call ale#util#ShowMessage(a:response.body.displayString)
-            endif
-        endif
-endfunction
-
 function! ale#signature#ParseLSPResult(result) abort
     let l:lines = []
     if has_key(a:result, 'signatures')
@@ -162,22 +132,12 @@ function! s:OnReady(line, column, opt, linter, lsp_details) abort
 
     let l:buffer = a:lsp_details.buffer
 
-    let l:Callback = a:linter.lsp is# 'tsserver'
-    \   ? function('ale#signature#HandleTSServerResponse')
-    \   : function('ale#signature#HandleLSPResponse')
-    call ale#lsp#RegisterCallback(l:id, l:Callback)
+    if a:linter.lsp isnot 'tsserver'
+        let l:Callback = function('ale#signature#HandleLSPResponse')
+        call ale#lsp#RegisterCallback(l:id, l:Callback)
 
-    if a:linter.lsp is# 'tsserver'
-        let l:column = a:column
-
-        let l:message = ale#lsp#tsserver_message#Quickinfo(
-        \   l:buffer,
-        \   a:line,
-        \   l:column
-        \)
-    else
         " Send a message saying the buffer has changed first, or the
-        " hover position probably won't make sense.
+        " position probably won't make sense.
         call ale#lsp#NotifyForChanges(l:id, l:buffer)
 
         let l:column = max([
@@ -186,26 +146,21 @@ function! s:OnReady(line, column, opt, linter, lsp_details) abort
         \])
 
         let l:message = ale#lsp#message#SignatureHelp(l:buffer, a:line, l:column)
+
+        let l:request_id = ale#lsp#Send(l:id, l:message)
+
+        let s:signature_map[l:request_id] = {
+        \   'buffer': l:buffer,
+        \   'line': a:line,
+        \   'column': l:column,
+        \}
     endif
-
-    let l:request_id = ale#lsp#Send(l:id, l:message)
-
-    let s:signature_map[l:request_id] = {
-    \   'buffer': l:buffer,
-    \   'line': a:line,
-    \   'column': l:column,
-    \}
 endfunction
 
 " Obtain SignatureHelp information for the specified position
 " Pass optional arguments in the dictionary opt.
-" Currently, only one key/value is useful:
-"   - called_from_balloonexpr, this flag marks if we want the result from this
-"     ale#hover#Show to display in a balloon if possible
 "
-" Currently, the callbacks displays the info from hover :
-" - in the balloon if opt.called_from_balloonexpr and balloon_show is detected
-" - as status message otherwise
+" Currently, the callbacks displays the info from signature help.
 function! ale#signature#Show(buffer, line, col, opt) abort
     let l:Callback = function('s:OnReady', [a:line, a:col, a:opt])
     for l:linter in ale#lsp_linter#GetEnabled(a:buffer)
