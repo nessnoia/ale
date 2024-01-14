@@ -15,7 +15,7 @@ function! ale#signature#ClearLSPData() abort
 endfunction
 
 function! ale#signature#ParseLSPResult(result) abort
-    let l:lines = []
+    let l:functions = []
     if has_key(a:result, 'signatures')
         let l:signatures = a:result.signatures
     else
@@ -24,11 +24,15 @@ function! ale#signature#ParseLSPResult(result) abort
 
     for l:signature in l:signatures
         if type(l:signature) is v:t_dict && has_key(l:signature, 'label')
-            call add(l:lines, l:signature.label)
+            call add(l:functions, l:signature.label)
         endif
     endfor
 
-    return l:lines
+    " For some reason on some LSPs when trying to use a:result.activeParameter the number doesn't update for the first
+    " parameter with is really odd (key doesn't exist). So instead, just use this slightly janky solution.
+    let l:active_param_index = s:GetActiveParameterIndex()
+
+    return [l:functions, l:active_param_index]
 endfunction
 
 function! ale#signature#HandleLSPResponse(conn_id, response) abort
@@ -43,11 +47,9 @@ function! ale#signature#HandleLSPResponse(conn_id, response) abort
             return
         endif
 
-        let l:functions = ale#signature#ParseLSPResult(l:result)
+        let [l:functions, l:active_param_index] = ale#signature#ParseLSPResult(l:result)
 
         if !empty(l:functions)
-            let l:active_param_index = s:GetActiveParameterIndex()
-
             let l:commands = ['call clearmatches()']
             let [l:add_highlight_commands, l:functions] = s:GetCommandsAndApplicableFunctionsFromActiveIndex(l:functions, l:active_param_index)
             call extend(l:commands, l:add_highlight_commands)
@@ -116,7 +118,7 @@ function! s:GetCommandsAndApplicableFunctionsFromActiveIndex(functions, active_p
             let l:active_param = l:parameters[a:active_param_index + 1]
 
             call add(l:applicable_functions, l:function)
-            call add(l:commands, "let m = matchadd('ALESignatureHelp', '" . l:active_param . "')")
+            call add(l:commands, "let m = matchadd('ALESignatureHelp', '\\(\\<\\|,\\)\\zs" . l:active_param . "\\ze')")
         endif
     endfor
 
